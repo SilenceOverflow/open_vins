@@ -159,3 +159,11 @@ install(TARGETS test_sim_repeat
         RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
+# Run with offline data
+add_executable(run_stereo_inertial_euroc src/run_stereo_inertial_euroc.cpp)
+target_link_libraries(run_stereo_inertial_euroc ov_msckf_lib ${thirdparty_libraries})
+install(TARGETS run_stereo_inertial_euroc
+        ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+        LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+        RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
