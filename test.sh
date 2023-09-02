@@ -12,7 +12,7 @@ else
     cd build
 fi
 
-make -j`nproc`
+make -j2
 # sudo make install
 
 cd ${OV_PATH}
@@ -25,6 +25,7 @@ echo -e "\n\nrun **************************************************************"
 #     ~/Documents/EuRoC/MH_01_easy \
 #     ~/Documents/EuRoC/MH_01_easy/MH01.txt
 
+# taskset --cpu-list 0-3 \
 ${OV_PATH}/ov_msckf/build/run_stereo_inertial_euroc \
     ${OV_PATH}/config/euroc_mav/estimator_config.yaml \
     ~/Documents/EuRoC/V1_01_easy \

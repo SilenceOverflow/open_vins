@@ -16,15 +16,20 @@
 * If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include<iostream>
-#include<algorithm>
-#include<fstream>
-#include<iomanip>
-#include<chrono>
+#include <iostream>
+#include <algorithm>
+#include <fstream>
+#include <iomanip>
+#include <chrono>
 #include <ctime>
 #include <sstream>
 
 #include <memory>
+
+#include <functional>
+#include <numeric>
+#include <string>
+#include <vector>
 
 #ifdef ENABLE_ROS
     #include <ros/ros.h>
@@ -55,7 +60,7 @@ void LoadImages(const string &strPathLeft, const string &strPathRight, const str
 void LoadIMU(const string &strImuPath, vector<double> &vTimeStamps, vector<cv::Point3f> &vAcc, vector<cv::Point3f> &vGyro);
 
 
-std::shared_ptr<VioManager> sys;
+std::shared_ptr<ov_msckf::VioManager> sys;
 #ifdef ENABLE_ROS
 std::shared_ptr<ROS1Visualizer> viz;
 #endif
@@ -102,12 +107,12 @@ int run_rosfree(int argc, char **argv) {
     ov_core::Printer::setPrintLevel(verbosity);
 
     // Create our VIO system
-    VioManagerOptions params;
+    ov_msckf::VioManagerOptions params;
     params.print_and_load(parser);
     // params.num_opencv_threads = 0; // uncomment if you want repeatability
     // params.use_multi_threading_pubs = 0; // uncomment if you want repeatability
     params.use_multi_threading_subs = false;
-    sys = std::make_shared<VioManager>(params);
+    sys = std::make_shared<ov_msckf::VioManager>(params);
 
     // Ensure we read in all parameters required
     if (!parser->successful()) {
@@ -182,9 +187,15 @@ int run_rosfree(int argc, char **argv) {
 
     // Seq loop
     for (seq = 0; seq < num_seq; seq++) {
+        // Vector for tracking time statistics
+        vector<double> vTimesTrack;
+        vTimesTrack.resize(nImages[seq], 0.0);
+
         // Image loop
         for(int ni = 0; ni < nImages[seq]; ni++) {
-            
+            std::chrono::time_point<std::chrono::system_clock> t1 = std::chrono::system_clock::now();
+
+
             // IMU processing
             // Load imu measurements from previous frame
             if(ni > 0) {
@@ -246,10 +257,14 @@ int run_rosfree(int argc, char **argv) {
                 sys->feed_measurement_camera(message);
             }
 
+            std::chrono::time_point<std::chrono::system_clock> t2 = std::chrono::system_clock::now();
+            vTimesTrack[ni] = std::chrono::duration<double>(t2 - t1).count() * 1000;
+            cout << "processing image: " << ni << " using " << vTimesTrack[ni] << " ms" << endl;
+
 
             // State processing
             if (sys->initialized()) {
-                std::shared_ptr<State> state = sys->get_state();
+                std::shared_ptr<ov_msckf::State> state = sys->get_state();
 
                 // Save camera trajectory
                 // timestamp
@@ -269,6 +284,12 @@ int run_rosfree(int argc, char **argv) {
             // Wait to load the next frame
             // usleep(33 * 1e6); // 1e6
         } // per img
+
+        double t_avg = std::accumulate(vTimesTrack.begin(), vTimesTrack.end(), 0.0) / vTimesTrack.size();
+        cout << endl << "seq " << seq << ": " << endl;
+        cout << "\tt_avg: " << t_avg << " ms" << endl;
+        cout << "\tt_max: " << *std::max_element(vTimesTrack.begin(), vTimesTrack.end()) << " ms" << endl;
+        cout << "\tt_min: " << *std::min_element(vTimesTrack.begin(), vTimesTrack.end()) << " ms" << endl;
 
 
         // if(seq < num_seq - 1) {
